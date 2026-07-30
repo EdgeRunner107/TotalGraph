@@ -1,0 +1,1007 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Weflab 후원 목표 게이지</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+:root{
+  /* =========================================================
+     전체 화면 설정
+     ========================================================= */
+
+  /* OBS 브라우저 소스 권장 크기 */
+  --canvas-width:1000px;
+  --canvas-height:180px;
+
+  /* 화면 배경
+     완전 투명 배경을 원하면 transparent로 변경 */
+  --page-background:#62f500;
+
+
+  /* =========================================================
+     게이지 전체 위치와 크기
+     ========================================================= */
+
+  /* 게이지의 가로 너비 */
+  --bar-width:920px;
+
+  /* 게이지의 세로 높이 */
+  --bar-height:82px;
+
+  /* 게이지의 위쪽 위치 */
+  --bar-top:45px;
+
+  /* 게이지의 왼쪽 위치 */
+  --bar-left:40px;
+
+  /* 게이지 모서리 둥글기 */
+  --bar-radius:10px;
+
+  /* 게이지 바깥 테두리 두께 */
+  --bar-border-width:4px;
+
+  /* 게이지 바깥 테두리 색상 */
+  --bar-border-color:rgba(255,255,255,.72);
+
+
+  /* =========================================================
+     게이지 배경 디자인
+     ========================================================= */
+
+  /* 아직 채워지지 않은 영역의 기본 배경 */
+  --bar-track-background:
+    linear-gradient(
+      90deg,
+      rgba(86,105,178,.78),
+      rgba(91,119,205,.72)
+    );
+
+  /* 내부 은은한 테두리 */
+  --bar-inner-border:rgba(27,42,92,.72);
+
+  /* 바깥 그림자 */
+  --bar-shadow:
+    0 0 10px rgba(158,184,255,.86),
+    0 0 22px rgba(112,141,255,.48),
+    inset 0 0 13px rgba(255,255,255,.42);
+
+
+  /* =========================================================
+     채워지는 진행 영역
+     ========================================================= */
+
+  /* 진행 바 색상 */
+  --progress-background:
+    linear-gradient(
+      90deg,
+      #8fa8ff 0%,
+      #a8bbff 35%,
+      #c1c9ff 72%,
+      #e2ddff 100%
+    );
+
+  /* 진행 바 안쪽 빛 효과 */
+  --progress-glow:
+    inset 0 2px 9px rgba(255,255,255,.84),
+    inset 0 -6px 10px rgba(80,99,190,.26),
+    0 0 14px rgba(180,194,255,.84);
+
+  /* 게이지가 변할 때 애니메이션 시간 */
+  --progress-duration:900ms;
+
+
+  /* =========================================================
+     중앙 숫자 텍스트
+     ========================================================= */
+
+  /* 글자 크기 */
+  --text-size:42px;
+
+  /* 글자 굵기 */
+  --text-weight:900;
+
+  /* 글자색 */
+  --text-color:#ffffff;
+
+  /* 글자 사이 간격 */
+  --text-letter-spacing:-1px;
+
+  /* 글자 테두리 느낌의 그림자 */
+  --text-shadow:
+    -2px -2px 0 rgba(105,120,190,.65),
+     2px -2px 0 rgba(105,120,190,.65),
+    -2px  2px 0 rgba(105,120,190,.65),
+     2px  2px 0 rgba(105,120,190,.65),
+     0 0 8px rgba(255,255,255,.95);
+
+
+  /* =========================================================
+     장식 별
+     ========================================================= */
+
+  /* 별의 색상 */
+  --star-color:rgba(255,255,255,.84);
+
+  /* 별의 크기 */
+  --star-size:22px;
+
+
+  /* =========================================================
+     관리자 패널
+     ========================================================= */
+
+  --admin-width:380px;
+  --admin-background:#62f500;
+  --admin-line:#30394a;
+  --admin-text:#eef3ff;
+  --admin-muted:#a2aec2;
+  --admin-accent:#557dff;
+  --admin-success:#42d392;
+}
+
+*{
+  box-sizing:border-box;
+}
+
+html,
+body{
+  margin:0;
+  min-height:100%;
+  font-family:Arial,"Noto Sans KR",sans-serif;
+}
+
+body{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) var(--admin-width);
+  background:#090d14;
+  color:var(--admin-text);
+}
+
+
+/* =========================================================
+   미리보기 화면
+   ========================================================= */
+
+.preview-shell{
+  min-width:0;
+  padding:20px;
+  overflow:auto;
+  background:#090d14;
+}
+
+.preview-stage{
+  position:relative;
+  width:var(--canvas-width);
+  height:var(--canvas-height);
+  background:var(--page-background);
+  overflow:hidden;
+  transform-origin:top left;
+}
+
+
+/* =========================================================
+   게이지 본체
+   ========================================================= */
+
+.goal-bar{
+  position:absolute;
+  top:var(--bar-top);
+  left:var(--bar-left);
+  width:var(--bar-width);
+  height:var(--bar-height);
+
+  border:var(--bar-border-width) solid var(--bar-border-color);
+  border-radius:var(--bar-radius);
+  background:var(--bar-track-background);
+  box-shadow:var(--bar-shadow);
+
+  overflow:hidden;
+  isolation:isolate;
+}
+
+/* 안쪽 테두리 */
+.goal-bar::before{
+  content:"";
+  position:absolute;
+  inset:2px;
+  z-index:5;
+  border:2px solid var(--bar-inner-border);
+  border-radius:calc(var(--bar-radius) - 4px);
+  pointer-events:none;
+}
+
+/* 위쪽 유리광택 */
+.goal-bar::after{
+  content:"";
+  position:absolute;
+  top:0;
+  left:0;
+  right:0;
+  height:46%;
+  z-index:4;
+  background:linear-gradient(
+    to bottom,
+    rgba(255,255,255,.62),
+    rgba(255,255,255,.08)
+  );
+  pointer-events:none;
+}
+
+
+/* =========================================================
+   실제 채워지는 진행 바
+   ========================================================= */
+
+.goal-progress{
+  position:absolute;
+  inset:0 auto 0 0;
+  z-index:1;
+  width:0%;
+  min-width:0;
+  border-radius:calc(var(--bar-radius) - var(--bar-border-width));
+  background:var(--progress-background);
+  box-shadow:var(--progress-glow);
+  transition:width var(--progress-duration) cubic-bezier(.22,.85,.28,1);
+  overflow:hidden;
+}
+
+/* 진행 영역 내부의 은은한 움직이는 빛 */
+.goal-progress::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:
+    linear-gradient(
+      115deg,
+      transparent 0%,
+      rgba(255,255,255,.18) 32%,
+      rgba(255,255,255,.58) 46%,
+      rgba(255,255,255,.12) 59%,
+      transparent 78%
+    );
+  transform:translateX(-130%);
+  animation:shine 4s ease-in-out infinite;
+}
+
+@keyframes shine{
+  0%,55%{transform:translateX(-130%)}
+  100%{transform:translateX(130%)}
+}
+
+
+/* =========================================================
+   중앙 텍스트
+   ========================================================= */
+
+.goal-text{
+  position:absolute;
+  inset:0;
+  z-index:10;
+
+  display:flex;
+  align-items:center;
+  justify-content:center;
+
+  color:var(--text-color);
+  font-size:var(--text-size);
+  font-weight:var(--text-weight);
+  letter-spacing:var(--text-letter-spacing);
+  line-height:1;
+  text-shadow:var(--text-shadow);
+  white-space:nowrap;
+  pointer-events:none;
+}
+
+.goal-current,
+.goal-target{
+  font-variant-numeric:tabular-nums;
+}
+
+
+/* =========================================================
+   장식 별
+   ========================================================= */
+
+.star{
+  position:absolute;
+  z-index:7;
+  color:var(--star-color);
+  font-size:var(--star-size);
+  line-height:1;
+  text-shadow:0 0 7px rgba(255,255,255,.95);
+  animation:twinkle 2.4s ease-in-out infinite;
+  pointer-events:none;
+}
+
+.star.one{
+  top:10px;
+  left:18%;
+}
+
+.star.two{
+  top:8px;
+  right:12%;
+  animation-delay:.8s;
+}
+
+.star.three{
+  bottom:8px;
+  left:67%;
+  font-size:calc(var(--star-size) * .72);
+  animation-delay:1.4s;
+}
+
+@keyframes twinkle{
+  0%,100%{
+    opacity:.42;
+    transform:scale(.84) rotate(0deg);
+  }
+  50%{
+    opacity:1;
+    transform:scale(1.16) rotate(16deg);
+  }
+}
+
+
+/* =========================================================
+   관리자 패널
+   ========================================================= */
+
+.admin{
+  position:sticky;
+  top:0;
+  height:100vh;
+  overflow:auto;
+  padding:22px;
+  background:var(--admin-background);
+  border-left:1px solid var(--admin-line);
+}
+
+.admin h1{
+  margin:0 0 7px;
+  font-size:23px;
+}
+
+.admin .sub{
+  margin-bottom:18px;
+  color:var(--admin-muted);
+  font-size:13px;
+  line-height:1.55;
+}
+
+.section{
+  margin-bottom:15px;
+  padding:15px;
+  border:1px solid var(--admin-line);
+  border-radius:13px;
+  background:rgba(255,255,255,.025);
+}
+
+.section-title{
+  margin-bottom:12px;
+  font-size:14px;
+  font-weight:900;
+}
+
+.field{
+  display:grid;
+  gap:6px;
+  margin-bottom:11px;
+}
+
+label{
+  color:var(--admin-muted);
+  font-size:12px;
+  font-weight:800;
+}
+
+input,
+select,
+button{
+  width:100%;
+  border-radius:9px;
+  font:inherit;
+}
+
+input,
+select{
+  padding:11px 12px;
+  color:var(--admin-text);
+  background:#0d121b;
+  border:1px solid var(--admin-line);
+  outline:none;
+}
+
+button{
+  border:0;
+  padding:11px 12px;
+  color:#fff;
+  font-weight:900;
+  cursor:pointer;
+}
+
+.btn-primary{
+  background:var(--admin-accent);
+}
+
+.btn-secondary{
+  background:#2b3444;
+}
+
+.btn-row{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:9px;
+}
+
+.status-line{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:8px;
+  font-size:13px;
+}
+
+.status-value{
+  color:var(--admin-muted);
+  font-weight:800;
+  text-align:right;
+}
+
+.status-value.on{
+  color:var(--admin-success);
+}
+
+.help{
+  color:var(--admin-muted);
+  font-size:12px;
+  line-height:1.65;
+}
+
+kbd{
+  padding:2px 5px;
+  border:1px solid var(--admin-line);
+  border-radius:5px;
+  background:#0b1018;
+}
+
+
+/* =========================================================
+   OBS 모드
+   주소 뒤에 ?obs=1 을 붙이면 관리자 패널이 사라집니다.
+   ========================================================= */
+
+body.obs-mode{
+  display:block;
+  width:var(--canvas-width);
+  height:var(--canvas-height);
+  overflow:hidden;
+  background:var(--page-background);
+}
+
+body.obs-mode .admin{
+  display:none;
+}
+
+body.obs-mode .preview-shell{
+  padding:0;
+  overflow:hidden;
+  background:var(--page-background);
+}
+
+body.obs-mode .preview-stage{
+  transform:none!important;
+}
+
+
+/* 작은 화면 대응 */
+@media(max-width:1100px){
+  body:not(.obs-mode){
+    grid-template-columns:1fr;
+  }
+
+  body:not(.obs-mode) .admin{
+    position:relative;
+    height:auto;
+    border-left:0;
+    border-top:1px solid var(--admin-line);
+  }
+}
+</style>
+</head>
+
+<body>
+
+<section class="preview-shell">
+  <div id="previewStage" class="preview-stage">
+
+    <div class="goal-bar">
+      <div id="goalProgress" class="goal-progress"></div>
+
+      <span class="star one">✦</span>
+      <span class="star two">★</span>
+      <span class="star three">✦</span>
+
+      <div class="goal-text">
+        <span id="currentAmount" class="goal-current">0</span>
+        <span>&nbsp;/&nbsp;</span>
+        <span id="targetAmount" class="goal-target">1,000,000</span>
+        <span>&nbsp;개</span>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+
+<aside class="admin">
+
+  <h1>Weflab 후원 목표 게이지</h1>
+  <div class="sub">
+    weflab_donations 테이블의 amount 전체 합계를 가져와
+    목표 게이지로 표시합니다.
+  </div>
+
+  <div class="section">
+    <div class="section-title">Supabase 연결</div>
+
+    <div class="field">
+      <label>Project URL</label>
+      <input id="urlInput" placeholder="https://xxxx.supabase.co">
+    </div>
+
+    <div class="field">
+      <label>Anon Key</label>
+      <input id="keyInput" type="password" placeholder="eyJ...">
+    </div>
+
+    <div class="btn-row">
+      <button id="connectBtn" class="btn-primary">연결 및 저장</button>
+      <button id="clearBtn" class="btn-secondary">저장값 삭제</button>
+    </div>
+  </div>
+
+
+  <div class="section">
+    <div class="section-title">조회 설정</div>
+
+    <div class="field">
+      <label>조회 주기</label>
+      <select id="refreshInput">
+        <option value="1000">1초</option>
+        <option value="2000">2초</option>
+        <option value="3000" selected>3초</option>
+        <option value="5000">5초</option>
+        <option value="10000">10초</option>
+      </select>
+    </div>
+
+    <div class="btn-row">
+      <button id="refreshBtn" class="btn-secondary">지금 조회</button>
+      <button id="toggleBtn" class="btn-primary">자동 조회 시작</button>
+    </div>
+  </div>
+
+
+  <div class="section">
+    <div class="section-title">현재 상태</div>
+
+    <div class="status-line">
+      <span>연결 상태</span>
+      <span id="statusText" class="status-value">연결 안 됨</span>
+    </div>
+
+    <div class="status-line">
+      <span>받은 금액</span>
+      <span id="receivedText" class="status-value">0개</span>
+    </div>
+
+    <div class="status-line">
+      <span>현재 목표</span>
+      <span id="goalText" class="status-value">1,000,000개</span>
+    </div>
+
+    <div class="status-line">
+      <span>달성률</span>
+      <span id="percentText" class="status-value">0%</span>
+    </div>
+
+    <div class="status-line">
+      <span>마지막 갱신</span>
+      <span id="lastText" class="status-value">-</span>
+    </div>
+  </div>
+
+
+  <div class="section help">
+    <b>목표 계산 방식</b><br>
+    받은 금액이 100만 이하이면 목표는 100만입니다.<br>
+    100만을 넘으면 10만 단위로 자동 올림됩니다.<br><br>
+
+    예시:<br>
+    950,000 → 목표 1,000,000<br>
+    1,000,000 → 목표 1,000,000<br>
+    1,010,000 → 목표 1,100,000<br>
+    1,110,000 → 목표 1,200,000<br><br>
+
+    <b>OBS 브라우저 소스</b><br>
+    주소 뒤에 <kbd>?obs=1</kbd>을 붙이세요.<br>
+    권장 크기: 1000 × 180
+  </div>
+
+</aside>
+
+
+<script>
+const STORAGE_KEY='weflab_total_goal_progress_v1';
+const DONATION_TABLE='weflab_donations';
+
+const BASE_GOAL=1000000;
+const GOAL_STEP=100000;
+
+let db=null;
+let timer=null;
+let autoRunning=false;
+let loading=false;
+let currentDisplayedAmount=0;
+
+const $=id=>document.getElementById(id);
+const fmt=new Intl.NumberFormat('ko-KR');
+
+
+/* =========================================================
+   OBS 모드
+   ========================================================= */
+
+function applyObsMode(){
+  const params=new URLSearchParams(location.search);
+
+  if(params.get('obs')==='1'){
+    document.body.classList.add('obs-mode');
+  }
+}
+
+
+/* =========================================================
+   관리자 미리보기 자동 축소
+   ========================================================= */
+
+function fitPreview(){
+  if(document.body.classList.contains('obs-mode')) return;
+
+  const stage=$('previewStage');
+  const shell=document.querySelector('.preview-shell');
+
+  const usableWidth=Math.max(320,shell.clientWidth-40);
+  const scale=Math.min(1,usableWidth/1000);
+
+  stage.style.transform=`scale(${scale})`;
+  shell.style.height=`${180*scale+40}px`;
+}
+
+
+/* =========================================================
+   설정 저장 및 복원
+   ========================================================= */
+
+function saveSettings(){
+  localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify({
+      url:$('urlInput').value.trim(),
+      key:$('keyInput').value.trim(),
+      refresh:$('refreshInput').value
+    })
+  );
+}
+
+function loadSettings(){
+  try{
+    const saved=JSON.parse(
+      localStorage.getItem(STORAGE_KEY)||'{}'
+    );
+
+    $('urlInput').value=saved.url||'';
+    $('keyInput').value=saved.key||'';
+    $('refreshInput').value=saved.refresh||'3000';
+
+    return saved;
+  }catch{
+    return {};
+  }
+}
+
+
+/* =========================================================
+   목표값 계산
+   ========================================================= */
+
+/*
+  100만원 이하:
+    목표 100만원 고정
+
+  100만원 초과:
+    10만원 단위로 올림
+
+  예:
+    1,110,000 / 100,000 = 11.1
+    ceil(11.1) = 12
+    목표 = 1,200,000
+*/
+function calculateGoal(received){
+  const amount=Math.max(0,Number(received)||0);
+
+  if(amount<=BASE_GOAL){
+    return BASE_GOAL;
+  }
+
+  return Math.ceil(amount/GOAL_STEP)*GOAL_STEP;
+}
+
+
+/* =========================================================
+   숫자 증가 애니메이션
+   ========================================================= */
+
+function animateNumber(element,from,to,duration=850){
+  const start=performance.now();
+  const difference=to-from;
+
+  function frame(now){
+    const progress=Math.min(1,(now-start)/duration);
+    const eased=1-Math.pow(1-progress,3);
+    const value=Math.round(from+(difference*eased));
+
+    element.textContent=fmt.format(value);
+
+    if(progress<1){
+      requestAnimationFrame(frame);
+    }
+  }
+
+  requestAnimationFrame(frame);
+}
+
+
+/* =========================================================
+   화면 갱신
+   ========================================================= */
+
+function renderProgress(received){
+  const amount=Math.max(0,Number(received)||0);
+  const goal=calculateGoal(amount);
+
+  /*
+    진행률은 100%를 넘지 않도록 제한합니다.
+    목표는 받은 금액에 맞춰 자동 증가하므로 일반적으로 100% 이하입니다.
+  */
+  const percent=Math.min(100,(amount/goal)*100);
+
+  animateNumber(
+    $('currentAmount'),
+    currentDisplayedAmount,
+    amount
+  );
+
+  $('targetAmount').textContent=fmt.format(goal);
+  $('goalProgress').style.width=`${percent}%`;
+
+  $('receivedText').textContent=`${fmt.format(amount)}개`;
+  $('goalText').textContent=`${fmt.format(goal)}개`;
+  $('percentText').textContent=`${percent.toFixed(1)}%`;
+
+  currentDisplayedAmount=amount;
+}
+
+
+/* =========================================================
+   상태 표시
+   ========================================================= */
+
+function setStatus(text,success=false){
+  $('statusText').textContent=text;
+  $('statusText').classList.toggle('on',success);
+}
+
+
+/* =========================================================
+   Supabase 전체 amount 합계 조회
+   ========================================================= */
+
+/*
+  Supabase JS에서 모든 행을 한 번에 가져와 합산하면
+  데이터가 많을 때 기본 1,000행 제한에 걸릴 수 있습니다.
+
+  따라서 1,000개씩 페이지를 나누어 amount 컬럼만 가져와
+  브라우저에서 전체 합계를 계산합니다.
+*/
+async function fetchTotalAmount(){
+  const PAGE_SIZE=1000;
+  let from=0;
+  let total=0;
+
+  while(true){
+    const to=from+PAGE_SIZE-1;
+
+    const {data,error}=await db
+      .from(DONATION_TABLE)
+      .select('amount')
+      .range(from,to);
+
+    if(error){
+      throw error;
+    }
+
+    const rows=data||[];
+
+    for(const row of rows){
+      total+=Number(row.amount||0);
+    }
+
+    if(rows.length<PAGE_SIZE){
+      break;
+    }
+
+    from+=PAGE_SIZE;
+  }
+
+  return total;
+}
+
+
+/* =========================================================
+   데이터 갱신
+   ========================================================= */
+
+async function loadTotal(){
+  if(!db||loading) return;
+
+  loading=true;
+
+  try{
+    const total=await fetchTotalAmount();
+
+    renderProgress(total);
+
+    $('lastText').textContent=new Date().toLocaleTimeString(
+      'ko-KR',
+      {hour12:false}
+    );
+
+    setStatus('정상 연결',true);
+  }catch(error){
+    console.error(error);
+    setStatus(`조회 실패: ${error.message}`);
+  }finally{
+    loading=false;
+  }
+}
+
+
+/* =========================================================
+   자동 조회
+   ========================================================= */
+
+function stopAuto(){
+  if(timer){
+    clearTimeout(timer);
+  }
+
+  timer=null;
+  autoRunning=false;
+  $('toggleBtn').textContent='자동 조회 시작';
+}
+
+function scheduleNext(){
+  if(!autoRunning) return;
+
+  timer=setTimeout(async()=>{
+    await loadTotal();
+    scheduleNext();
+  },Math.max(1000,Number($('refreshInput').value||3000)));
+}
+
+async function startAuto(){
+  if(!db){
+    alert('먼저 Supabase를 연결하세요.');
+    return;
+  }
+
+  stopAuto();
+
+  autoRunning=true;
+  $('toggleBtn').textContent='자동 조회 중지';
+
+  await loadTotal();
+  scheduleNext();
+}
+
+
+/* =========================================================
+   Supabase 연결
+   ========================================================= */
+
+function connect(){
+  const url=$('urlInput').value.trim();
+  const key=$('keyInput').value.trim();
+
+  if(!url||!key){
+    alert('Supabase Project URL과 Anon Key를 입력하세요.');
+    return;
+  }
+
+  saveSettings();
+
+  db=supabase.createClient(url,key);
+  currentDisplayedAmount=0;
+
+  startAuto();
+}
+
+
+/* =========================================================
+   버튼 이벤트
+   ========================================================= */
+
+$('connectBtn').onclick=connect;
+
+$('clearBtn').onclick=()=>{
+  stopAuto();
+
+  localStorage.removeItem(STORAGE_KEY);
+
+  $('urlInput').value='';
+  $('keyInput').value='';
+
+  db=null;
+  currentDisplayedAmount=0;
+
+  renderProgress(0);
+  setStatus('저장값 삭제됨');
+};
+
+$('refreshBtn').onclick=loadTotal;
+
+$('toggleBtn').onclick=()=>{
+  if(autoRunning){
+    stopAuto();
+  }else{
+    startAuto();
+  }
+};
+
+$('refreshInput').onchange=()=>{
+  saveSettings();
+
+  if(autoRunning){
+    startAuto();
+  }
+};
+
+window.onresize=fitPreview;
+window.onbeforeunload=stopAuto;
+
+
+/* =========================================================
+   초기 실행
+   ========================================================= */
+
+applyObsMode();
+
+const saved=loadSettings();
+
+if(saved.url&&saved.key){
+  db=supabase.createClient(saved.url,saved.key);
+  startAuto();
+}else{
+  renderProgress(0);
+}
+
+fitPreview();
+</script>
+
+</body>
+</html>
